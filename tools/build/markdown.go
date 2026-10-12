@@ -76,7 +76,7 @@ func parsePage(md goldmark.Markdown, id, lang, file string, src []byte, en *page
 	for i, n := range nodes {
 		h := heading{level: n.Level, text: plainText(n, src)}
 		if v, ok := n.AttributeString("id"); ok {
-			h.id = fmt.Sprint(stringOf(v))
+			h.id = stringOf(v)
 		} else if sameShape {
 			h.id = en.heads[i].id
 		} else {

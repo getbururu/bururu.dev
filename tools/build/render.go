@@ -52,7 +52,6 @@ type pageData struct {
 	NoIndex     bool
 	Alternates  []alternate
 	Home        string
-	Version     *docVersion
 	VersionMenu []menuItem
 	LangMenu    []menuItem
 	Nav         []navGroup
@@ -72,8 +71,8 @@ type pageData struct {
 type alternate struct{ Lang, URL string }
 
 type menuItem struct {
-	Label, Note, URL, Lang, Dir string
-	Current                     bool
+	Label, Note, URL, Lang string
+	Current                bool
 }
 
 type navGroup struct {
@@ -82,9 +81,9 @@ type navGroup struct {
 }
 
 type navItem struct {
-	Title, URL, Lang, Dir string
-	Current               bool
-	Heads                 []navHead
+	Title, URL, Lang string
+	Current          bool
+	Heads            []navHead
 }
 
 type navHead struct{ Text, URL string }
@@ -189,7 +188,6 @@ func (s *site) data(v *docVersion, l language, current string) *pageData {
 		VersionID: v.id,
 		T:         map[string]string{},
 		Home:      pageURL(v.id, l.Code, "index"),
-		Version:   v,
 	}
 	for _, k := range uiKeys {
 		d.T[k] = s.t(l.Code, k)
@@ -214,7 +212,7 @@ func (s *site) data(v *docVersion, l language, current string) *pageData {
 		d.VersionMenu = append(d.VersionMenu, menuItem{Label: label, Note: note, URL: pageURL(ov.id, l.Code, id), Current: ov == v})
 	}
 	for _, ol := range s.langs {
-		d.LangMenu = append(d.LangMenu, menuItem{Label: ol.Name, URL: pageURL(v.id, ol.Code, target), Lang: ol.Code, Dir: ol.dir(), Current: ol.Code == l.Code})
+		d.LangMenu = append(d.LangMenu, menuItem{Label: ol.Name, URL: pageURL(v.id, ol.Code, target), Lang: ol.Code, Current: ol.Code == l.Code})
 	}
 
 	var main, player navGroup
@@ -257,7 +255,7 @@ func (s *site) data(v *docVersion, l language, current string) *pageData {
 
 func (s *site) navEntry(v *docVersion, lang, id string) *navItem {
 	p, _ := v.show(lang, id)
-	return &navItem{Title: p.title, URL: pageURL(v.id, lang, id), Lang: p.lang, Dir: s.lang(p.lang).dir()}
+	return &navItem{Title: p.title, URL: pageURL(v.id, lang, id), Lang: p.lang}
 }
 
 func (s *site) writeNotFound(tmpl *template.Template, file string, v *docVersion, l language) error {
