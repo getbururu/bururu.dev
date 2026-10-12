@@ -193,9 +193,14 @@ func TestVersions(t *testing.T) {
 		"/fr/* /0.14/fr/:splat 302",
 		"/rules /0.14/en/rules/ 302",
 		"/player/feel/ /0.14/en/player/feel/ 302",
+		// a version without a language
+		"/0.14/rules/ /0.14/en/rules/ 302",
+		"/0.14/player/feel /0.14/en/player/feel/ 302",
+		"/0.13/rules/ /0.13/en/rules/ 302",
 	} {
 		has(t, redirects, line+"\n", true)
 	}
+	has(t, redirects, "/0.13/player/feel", false)
 
 	feel := read(t, out, "0.14/de/player/feel/index.html")
 	// 0.13 has no such page, so its menu entry goes to its start page.
@@ -213,6 +218,65 @@ func TestVersions(t *testing.T) {
 	has(t, sitemap, "<loc>https://bururu.dev/0.14/fr/rules/</loc>", true)
 	has(t, sitemap, "<loc>https://bururu.dev/0.14/fr/</loc>", false)
 	has(t, sitemap, "/0.13/", false)
+}
+
+// A language code in lower case leads to that language, and no redirect
+// covers an address that has a page.
+func TestRedirectsForLanguageCodes(t *testing.T) {
+	fs := files()
+	fs["languages.json"] = `[{"code": "en", "name": "English"}, {"code": "pt-BR", "name": "Português (Brasil)"}]`
+	out := mustBuild(t, fs)
+	redirects := read(t, out, "_redirects")
+	for _, line := range []string{
+		"/pt-BR/* /0.14/pt-BR/:splat 302",
+		"/pt-br /0.14/pt-BR/ 302",
+		"/pt-br/* /0.14/pt-BR/:splat 302",
+	} {
+		has(t, redirects, line+"\n", true)
+	}
+	for _, line := range strings.Split(redirects, "\n") {
+		from, _, ok := strings.Cut(line, " ")
+		if !ok || strings.HasPrefix(line, "#") {
+			continue
+		}
+		file := strings.TrimPrefix(strings.TrimSuffix(from, "*"), "/")
+		if strings.HasSuffix(from, "*") {
+			continue // a splat: under a language or "latest", where no page is
+		}
+		for _, f := range []string{filepath.Join(file, "index.html"), file + ".html"} {
+			if st, err := os.Stat(filepath.Join(out, filepath.FromSlash(f))); err == nil && !st.IsDir() {
+				t.Errorf("the redirect %q covers the page %s", line, f)
+			}
+		}
+	}
+
+	fs["0.14/en/pt-br.md"] = "# A page named like a language\n"
+	if _, err := buildSite(t, fs); err == nil || !strings.Contains(err.Error(), `"pt-br" is a language`) {
+		t.Errorf("err = %v, want one about the page's name", err)
+	}
+}
+
+func TestPictures(t *testing.T) {
+	fs := files()
+	fs["0.14/en/rules.md"] += "\n![The rules page](shots/rules.png)\n\n[The full picture](shots/rules.png)\n"
+	fs["0.14/en/shots/rules.png"] = "en"
+	fs["0.14/en/player/feel.md"] += "\n![Effects](effects.svg)\n"
+	fs["0.14/en/player/effects.svg"] = "<svg/>"
+	fs["0.14/ar/player/effects.svg"] = "<svg>ar</svg>"
+	fs["0.14/fr/rules.md"] += "\n![Les règles](shots/rules.png)\n"
+	out := mustBuild(t, fs)
+	has(t, read(t, out, "0.14/en/rules/index.html"), `<img src="/0.14/en/shots/rules.png" alt="The rules page">`, true)
+	has(t, read(t, out, "0.14/en/rules/index.html"), `<a href="/0.14/en/shots/rules.png">The full picture</a>`, true)
+	// The French page has no picture of its own, so it shows the English one.
+	has(t, read(t, out, "0.14/fr/rules/index.html"), `<img src="/0.14/en/shots/rules.png" alt="Les règles">`, true)
+	// The English page shown in Arabic shows the English picture.
+	has(t, read(t, out, "0.14/ar/player/feel/index.html"), `<img src="/0.14/en/player/effects.svg" alt="Effects">`, true)
+	if got := read(t, out, "0.14/en/shots/rules.png"); got != "en" {
+		t.Errorf("the copied picture holds %q", got)
+	}
+	if got := read(t, out, "0.14/ar/player/effects.svg"); got != "<svg>ar</svg>" {
+		t.Errorf("the Arabic picture holds %q", got)
+	}
 }
 
 func TestRightToLeft(t *testing.T) {
@@ -286,7 +350,8 @@ func TestBrokenLinksStopTheBuild(t *testing.T) {
 		"missing page":    {"0.14/en/rules.md", "# Rules\n\n[x](nope.md)\n\n## Event rules\n\n## Example\n\n## Example\n", "content/0.14/en/rules.md: the link to \"nope.md\" goes to a page that does not exist"},
 		"missing heading": {"0.14/en/player/feel.md", "# Effects\n\n[x](../rules.md#nope)\n", "content/0.14/en/player/feel.md: the link to \"../rules.md#nope\" goes to a heading that page does not have"},
 		"own heading":     {"0.14/en/player/feel.md", "# Effects\n\n[x](#nope)\n", "goes to a heading this page does not have"},
-		"not a page":      {"0.14/en/player/feel.md", "# Effects\n\n[x](../shot.png)\n", "goes to a file the site does not carry"},
+		"not a page":      {"0.14/en/player/feel.md", "# Effects\n\n[x](../notes.txt)\n", "goes to a file the site does not carry"},
+		"no picture":      {"0.14/en/player/feel.md", "# Effects\n\n[x](../shot.png)\n", `the link to "../shot.png" goes to a picture that is not there`},
 		// The French page's headings changed shape, so it lost the
 		// English ids, and the English page's link into it breaks.
 		"translated heading": {"0.14/fr/rules.md", "# Règles\n\n## Règles d'événement\n\nTexte.\n", "content/0.14/fr/rules.md does not have: give that heading the English id, as in \"## Heading {#event-rules}\""},
@@ -307,12 +372,14 @@ func TestContentChecks(t *testing.T) {
 		edit func(map[string]string)
 		want string
 	}{
-		"no title":        {func(fs map[string]string) { fs["0.14/en/rules.md"] = "Text without a title.\n" }, "content/0.14/en/rules.md: the page needs a title"},
-		"listed, no file": {func(fs map[string]string) { fs["0.14/pages.json"] = `{"pages": ["index", "gone"]}` }, "lists gone, which has no content/0.14/en/gone.md"},
-		"no english":      {func(fs map[string]string) { fs["languages.json"] = `[{"code": "fr", "name": "Français"}]` }, "en is missing"},
-		"bad current":     {func(fs map[string]string) { fs["versions.json"] = `{"current": "9.9", "versions": [{"id": "0.14"}]}` }, "the current version \"9.9\""},
-		"ui key missing":  {func(fs map[string]string) { fs["ui/en.json"] = `{"skip": "Skip"}` }, "content/ui/en.json: \"site_name\" is missing"},
-		"local picture":   {func(fs map[string]string) { fs["0.14/en/rules.md"] = "# Rules\n\n![a](shot.png)\n" }, "pictures must come from another site"},
+		"no title":             {func(fs map[string]string) { fs["0.14/en/rules.md"] = "Text without a title.\n" }, "content/0.14/en/rules.md: the page needs a title"},
+		"listed, no file":      {func(fs map[string]string) { fs["0.14/pages.json"] = `{"pages": ["index", "gone"]}` }, "lists gone, which has no content/0.14/en/gone.md"},
+		"no english":           {func(fs map[string]string) { fs["languages.json"] = `[{"code": "fr", "name": "Français"}]` }, "en is missing"},
+		"bad current":          {func(fs map[string]string) { fs["versions.json"] = `{"current": "9.9", "versions": [{"id": "0.14"}]}` }, "the current version \"9.9\""},
+		"ui key missing":       {func(fs map[string]string) { fs["ui/en.json"] = `{"skip": "Skip"}` }, "content/ui/en.json: \"site_name\" is missing"},
+		"other site's picture": {func(fs map[string]string) { fs["0.14/en/rules.md"] = "# Rules\n\n![a](https://example.com/a.png)\n" }, "the site's Content-Security-Policy (img-src 'self' in static/_headers) blocks those"},
+		"missing picture":      {func(fs map[string]string) { fs["0.14/en/rules.md"] = "# Rules\n\n![a](shot.png)\n" }, `content/0.14/en/rules.md: the picture "shot.png" goes to a picture that is not there`},
+		"picture outside":      {func(fs map[string]string) { fs["0.14/en/rules.md"] = "# Rules\n\n![a](../../x.png)\n" }, "goes outside the language's folder"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			fs := files()

@@ -47,24 +47,26 @@ type site struct {
 
 // docVersion is the docs of one app version, such as 0.14.
 type docVersion struct {
-	id    string
-	api   string
-	order []string                    // page ids, as the sidebar lists them
-	pages map[string]map[string]*page // language -> page id -> page; only pages with a file
+	id       string
+	api      string
+	order    []string                     // page ids, as the sidebar lists them
+	pages    map[string]map[string]*page  // language -> page id -> page; only pages with a file
+	pictures map[string]map[string]string // language -> path in its folder ("player/shot.png") -> the file
 }
 
 // page is one Markdown file, parsed.
 type page struct {
-	id    string // "index", "rules", "player/feel"
-	lang  string
-	file  string // for messages, such as content/0.14/fr/rules.md
-	src   []byte
-	doc   ast.Node
-	title string
-	heads []heading
-	ids   map[string]bool
-	links []*ast.Link
-	dests [][]byte // each link's destination as written in the file
+	id     string // "index", "rules", "player/feel"
+	lang   string
+	file   string // for messages, such as content/0.14/fr/rules.md
+	src    []byte
+	doc    ast.Node
+	title  string
+	heads  []heading
+	ids    map[string]bool
+	links  []*ast.Link
+	dests  [][]byte // each link's destination as written in the file
+	images []*ast.Image
 }
 
 type heading struct {
@@ -162,7 +164,7 @@ func load(content string) (*site, error) {
 }
 
 func (s *site) loadVersion(content, id string) (*docVersion, error) {
-	v := &docVersion{id: id, pages: map[string]map[string]*page{}}
+	v := &docVersion{id: id, pages: map[string]map[string]*page{}, pictures: map[string]map[string]string{}}
 	dir := filepath.Join(content, id)
 	var pj struct {
 		Pages []string `json:"pages"`
@@ -172,6 +174,7 @@ func (s *site) loadVersion(content, id string) (*docVersion, error) {
 	}
 
 	md := newMarkdown()
+	// files reads a language's pages, and notes its pictures in v.
 	files := func(lang string) (map[string][]byte, error) {
 		out := map[string][]byte{}
 		root := filepath.Join(dir, lang)
@@ -179,10 +182,20 @@ func (s *site) loadVersion(content, id string) (*docVersion, error) {
 			if err != nil {
 				return err
 			}
-			if d.IsDir() || filepath.Ext(p) != ".md" {
+			if d.IsDir() {
 				return nil
 			}
 			rel, _ := filepath.Rel(root, p)
+			if isPicture(p) {
+				if v.pictures[lang] == nil {
+					v.pictures[lang] = map[string]string{}
+				}
+				v.pictures[lang][filepath.ToSlash(rel)] = p
+				return nil
+			}
+			if filepath.Ext(p) != ".md" {
+				return nil
+			}
 			b, err := os.ReadFile(p)
 			if err != nil {
 				return err
@@ -204,6 +217,14 @@ func (s *site) loadVersion(content, id string) (*docVersion, error) {
 		return nil, fmt.Errorf("content/%s/en has no pages", id)
 	}
 	v.pages["en"] = map[string]*page{}
+	for pid := range en {
+		// /<version>/<page>/ and /<page>/ lead to the English page, so a
+		// page cannot take a name those addresses already use.
+		first, _, _ := strings.Cut(pid, "/")
+		if first == "latest" || s.isLangCode(first) {
+			return nil, fmt.Errorf("content/%s/en/%s.md: %q is a language or \"latest\" in the site's addresses; give the page another name", id, pid, first)
+		}
+	}
 	for pid, src := range en {
 		p, err := parsePage(md, pid, "en", fmt.Sprintf("content/%s/en/%s.md", id, pid), src, nil)
 		if err != nil {
@@ -272,7 +293,32 @@ func (s *site) loadVersion(content, id string) (*docVersion, error) {
 			v.pages[l.Code][pid] = p
 		}
 	}
+
+	// The pictures: now that every language's files are known.
+	for _, l := range s.langs {
+		for _, p := range v.pages[l.Code] {
+			for _, img := range p.images {
+				dest := string(img.Destination)
+				to, err := v.picture(p, dest)
+				if err != "" {
+					return nil, fmt.Errorf("%s: the picture %q %s", p.file, dest, err)
+				}
+				img.Destination = []byte(to)
+			}
+		}
+	}
 	return v, nil
+}
+
+// isLangCode says whether s is a language's code, in any case: addresses
+// such as /pt-br/ lead to that language too.
+func (s *site) isLangCode(code string) bool {
+	for _, l := range s.langs {
+		if strings.EqualFold(l.Code, code) {
+			return true
+		}
+	}
+	return false
 }
 
 // pageURL is the address of a page: /0.14/en/ for the start page,

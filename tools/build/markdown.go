@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html"
+	"net/url"
 	"path"
 	"regexp"
 	"strconv"
@@ -53,9 +54,10 @@ func parsePage(md goldmark.Markdown, id, lang, file string, src []byte, en *page
 			p.links = append(p.links, n)
 			p.dests = append(p.dests, append([]byte(nil), n.Destination...))
 		case *ast.Image:
-			if !isExternal(string(n.Destination)) {
-				return ast.WalkStop, fmt.Errorf("%s: the picture %s: pictures must come from another site for now", file, n.Destination)
+			if isExternal(string(n.Destination)) {
+				return ast.WalkStop, fmt.Errorf("%s: the picture %s is on another site, and the site's Content-Security-Policy (img-src 'self' in static/_headers) blocks those. Put the picture next to the page, as in ![...](shot.png)", file, n.Destination)
 			}
+			p.images = append(p.images, n)
 		}
 		return ast.WalkContinue, nil
 	})
@@ -210,7 +212,10 @@ func (v *docVersion) linkTarget(p *page, lang, dest string) (to, err string) {
 		return dest, ""
 	}
 	if path.Ext(file) != ".md" {
-		return "", "goes to a file the site does not carry; link to .md pages only"
+		if isPicture(file) {
+			return v.picture(p, file)
+		}
+		return "", "goes to a file the site does not carry; link to .md pages and pictures only"
 	}
 	id := strings.TrimSuffix(path.Clean(path.Join(path.Dir(p.id), file)), ".md")
 	if !v.has(id) {
@@ -228,6 +233,38 @@ func (v *docVersion) linkTarget(p *page, lang, dest string) (to, err string) {
 		to += "#" + frag
 	}
 	return to, ""
+}
+
+// The kinds of pictures a page can show. They sit next to the pages, in
+// content/<version>/<lang>/, and the build copies them into the site.
+var pictureExt = map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".svg": true}
+
+func isPicture(name string) bool {
+	return pictureExt[strings.ToLower(path.Ext(name))]
+}
+
+// picture finds the picture that dest, written in page p, points at: in
+// the folder of p's language, or else in the English one, so a
+// translation can show the English pictures. It returns its address on
+// the site, or why it does not work.
+func (v *docVersion) picture(p *page, dest string) (to, err string) {
+	name := dest
+	if u, e := url.PathUnescape(dest); e == nil {
+		name = u
+	}
+	if strings.HasPrefix(name, "/") {
+		return "", "starts with /; write the picture's path from the page, as in shot.png"
+	}
+	rel := path.Clean(path.Join(path.Dir(p.id), name))
+	if rel == ".." || strings.HasPrefix(rel, "../") {
+		return "", "goes outside the language's folder"
+	}
+	for _, lang := range []string{p.lang, "en"} {
+		if _, ok := v.pictures[lang][rel]; ok {
+			return (&url.URL{Path: "/" + v.id + "/" + lang + "/" + rel}).EscapedPath(), ""
+		}
+	}
+	return "", "goes to a picture that is not there"
 }
 
 // render turns a parsed page into HTML, for the language its links were

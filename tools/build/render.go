@@ -110,6 +110,13 @@ func (s *site) write(out, static string) (int, error) {
 	seenErr := map[string]bool{}
 	written := 0
 	for _, v := range s.versions {
+		for lang, pics := range v.pictures {
+			for rel, file := range pics {
+				if err := copyFile(file, filepath.Join(out, v.id, lang, filepath.FromSlash(rel))); err != nil {
+					return 0, err
+				}
+			}
+		}
 		for _, l := range s.langs {
 			for i, id := range v.order {
 				p, translated := v.show(l.Code, id)
@@ -362,7 +369,10 @@ func sections(p *page) [][3]string {
 }
 
 // writeRedirects writes _redirects: the root, the version folders, and
-// addresses without a version or language lead to the current docs.
+// addresses without a version or language lead to the docs in English or
+// to the current version. A language code in lower case, such as /pt-br/,
+// leads to that language. Pages applies a redirect before it looks for a
+// file, so no rule here may match an address that has a page.
 func (s *site) writeRedirects(file string) error {
 	cur := s.current
 	var b strings.Builder
@@ -370,23 +380,38 @@ func (s *site) writeRedirects(file string) error {
 	b.WriteString("# Edit those files, not this one. Syntax:\n")
 	b.WriteString("# https://developers.cloudflare.com/pages/configuration/redirects/\n\n")
 	line := func(from, to string) { fmt.Fprintf(&b, "%s %s 302\n", from, to) }
+	both := func(from, to string) {
+		line(from, to)
+		line(from+"/", to)
+	}
 	line("/", "/"+cur+"/en/")
 	line("/latest", "/"+cur+"/en/")
 	line("/latest/*", "/"+cur+"/:splat")
+	// A version without a language: its English pages.
 	for _, v := range s.versions {
-		line("/"+v.id, "/"+v.id+"/en/")
-		line("/"+v.id+"/", "/"+v.id+"/en/")
-	}
-	for _, l := range s.langs {
-		line("/"+l.Code, "/"+cur+"/"+l.Code+"/")
-		line("/"+l.Code+"/*", "/"+cur+"/"+l.Code+"/:splat")
-	}
-	for _, id := range s.version(cur).order {
-		if id == "index" {
-			continue
+		both("/"+v.id, "/"+v.id+"/en/")
+		for _, id := range v.order {
+			if id != "index" {
+				both("/"+v.id+"/"+id, pageURL(v.id, "en", id))
+			}
 		}
-		line("/"+id, pageURL(cur, "en", id))
-		line("/"+id+"/", pageURL(cur, "en", id))
+	}
+	// A language without a version: the current version.
+	for _, l := range s.langs {
+		codes := []string{l.Code}
+		if lower := strings.ToLower(l.Code); lower != l.Code {
+			codes = append(codes, lower)
+		}
+		for _, c := range codes {
+			line("/"+c, "/"+cur+"/"+l.Code+"/")
+			line("/"+c+"/*", "/"+cur+"/"+l.Code+"/:splat")
+		}
+	}
+	// A page alone: the current version in English.
+	for _, id := range s.version(cur).order {
+		if id != "index" {
+			both("/"+id, pageURL(cur, "en", id))
+		}
 	}
 	return writeFile(file, []byte(b.String()))
 }
@@ -442,19 +467,26 @@ func copyTree(from, to string) error {
 		if path.Base(filepath.ToSlash(p)) == ".gitkeep" {
 			return nil
 		}
-		src, err := os.Open(p)
-		if err != nil {
-			return err
-		}
-		defer src.Close()
-		dst, err := os.Create(dest)
-		if err != nil {
-			return err
-		}
-		if _, err := io.Copy(dst, src); err != nil {
-			dst.Close()
-			return err
-		}
-		return dst.Close()
+		return copyFile(p, dest)
 	})
+}
+
+func copyFile(from, to string) error {
+	src, err := os.Open(from)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		return err
+	}
+	dst, err := os.Create(to)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(dst, src); err != nil {
+		dst.Close()
+		return err
+	}
+	return dst.Close()
 }
