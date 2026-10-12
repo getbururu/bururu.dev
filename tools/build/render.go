@@ -373,13 +373,20 @@ func sections(p *page) [][3]string {
 // to the current version. A language code in lower case, such as /pt-br/,
 // leads to that language. Pages applies a redirect before it looks for a
 // file, so no rule here may match an address that has a page.
+//
+// Cloudflare takes at most 100 dynamic rules (with a splat or a
+// placeholder) and counts every rule after the first dynamic one as
+// dynamic too, so the static rules all come first.
 func (s *site) writeRedirects(file string) error {
 	cur := s.current
-	var b strings.Builder
-	b.WriteString("# Made by tools/build from content/versions.json and languages.json.\n")
-	b.WriteString("# Edit those files, not this one. Syntax:\n")
-	b.WriteString("# https://developers.cloudflare.com/pages/configuration/redirects/\n\n")
-	line := func(from, to string) { fmt.Fprintf(&b, "%s %s 302\n", from, to) }
+	var static, dynamic strings.Builder
+	line := func(from, to string) {
+		b := &static
+		if isDynamic(from) {
+			b = &dynamic
+		}
+		fmt.Fprintf(b, "%s %s 302\n", from, to)
+	}
 	both := func(from, to string) {
 		line(from, to)
 		line(from+"/", to)
@@ -413,7 +420,21 @@ func (s *site) writeRedirects(file string) error {
 			both("/"+id, pageURL(cur, "en", id))
 		}
 	}
+	var b strings.Builder
+	b.WriteString("# Made by tools/build from content/versions.json and languages.json.\n")
+	b.WriteString("# Edit those files, not this one. Syntax:\n")
+	b.WriteString("# https://developers.cloudflare.com/pages/configuration/redirects/\n")
+	b.WriteString("# The static rules come first: Cloudflare counts every rule after the\n")
+	b.WriteString("# first one with a splat or a placeholder as dynamic (at most 100).\n\n")
+	b.WriteString(static.String())
+	b.WriteString(dynamic.String())
 	return writeFile(file, []byte(b.String()))
+}
+
+// isDynamic reports whether a redirect's source has a splat or a
+// placeholder, which makes it one of Cloudflare's dynamic rules.
+func isDynamic(from string) bool {
+	return strings.Contains(from, "*") || strings.Contains(from, "/:")
 }
 
 // writeSitemap lists the current version's pages that have their own

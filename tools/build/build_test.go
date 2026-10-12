@@ -220,6 +220,38 @@ func TestVersions(t *testing.T) {
 	has(t, sitemap, "/0.13/", false)
 }
 
+// Cloudflare counts every rule after the first dynamic one as dynamic
+// and takes at most 100 of them, so the static rules come first. Checked
+// on the real content, with all its versions and languages.
+func TestRedirectsStaticFirst(t *testing.T) {
+	s, err := load(filepath.Join("..", "..", "content"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := s.write(out, filepath.Join("..", "..", "static")); err != nil {
+		t.Fatal(err)
+	}
+	statics, dynamics := 0, 0
+	for _, line := range strings.Split(read(t, out, "_redirects"), "\n") {
+		from, _, ok := strings.Cut(line, " ")
+		if !ok || strings.HasPrefix(line, "#") {
+			continue
+		}
+		switch {
+		case isDynamic(from):
+			dynamics++
+		case dynamics > 0:
+			t.Fatalf("a static rule after a dynamic one: %q", line)
+		default:
+			statics++
+		}
+	}
+	if dynamics > 100 || statics > 2000 {
+		t.Errorf("%d static and %d dynamic rules; Cloudflare takes 2000 and 100", statics, dynamics)
+	}
+}
+
 // A language code in lower case leads to that language, and no redirect
 // covers an address that has a page.
 func TestRedirectsForLanguageCodes(t *testing.T) {
