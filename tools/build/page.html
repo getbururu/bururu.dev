@@ -64,9 +64,9 @@
       {{template "brand" .}}
       <div class="tools">
         <details class="menu menu-pages">
-          <summary>
+          <summary aria-label="{{.T.pages}}">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>
-            <span>{{.T.pages}}</span>
+            <span class="pages-label">{{.T.pages}}</span>
           </summary>
           <div class="pop">
             <nav aria-label="{{.T.pages}}">
@@ -90,36 +90,39 @@
           <div class="pop results" id="search-results" data-empty="{{.T.no_results}}" hidden></div>
         </div>
 
-        <details class="menu menu-version">
-          <summary aria-label="{{.T.version}}: {{.VersionID}}">
-            <span>{{.VersionID}}</span>
-            <svg class="chev" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="m4 6 4 4 4-4"/></svg>
-          </summary>
-          <div class="pop">
-            <p class="pop-title">{{.T.version}}</p>
-            <ul>
-              {{- range .VersionMenu}}
-              <li><a href="{{.URL}}"{{if .Current}} aria-current="true"{{end}}>{{.Label}}{{with .Note}}<span class="item-note">{{.}}</span>{{end}}</a></li>
-              {{- end}}
-            </ul>
-          </div>
-        </details>
+        <div class="pick">
+          <details class="menu menu-version">
+            <summary aria-label="{{.T.version}}: {{.VersionID}}">
+              <span>{{.VersionID}}</span>
+              <svg class="chev" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="m4 6 4 4 4-4"/></svg>
+            </summary>
+            <div class="pop">
+              <p class="pop-title">{{.T.version}}</p>
+              <ul>
+                {{- range .VersionMenu}}
+                <li><a href="{{.URL}}"{{if .Current}} aria-current="true"{{end}}>{{.Label}}{{with .Note}}<span class="item-note">{{.}}</span>{{end}}</a></li>
+                {{- end}}
+              </ul>
+            </div>
+          </details>
 
-        <details class="menu menu-lang">
-          <summary aria-label="{{.T.language}}: {{.Lang.Name}}">
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14C6.2 12.3 5.4 10.3 5.4 8S6.2 3.7 8 2Z"/></g></svg>
-            <span class="lang-name">{{.Lang.Name}}</span>
-            <svg class="chev" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="m4 6 4 4 4-4"/></svg>
-          </summary>
-          <div class="pop">
-            <p class="pop-title">{{.T.language}}</p>
-            <ul class="langs">
-              {{- range .LangMenu}}
-              <li><a href="{{.URL}}" hreflang="{{.Lang}}" lang="{{.Lang}}"{{if .Current}} aria-current="true"{{end}}>{{.Label}}</a></li>
-              {{- end}}
-            </ul>
-          </div>
-        </details>
+          <details class="menu menu-lang">
+            <summary aria-label="{{.T.language}}: {{.Lang.Name}}">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14C6.2 12.3 5.4 10.3 5.4 8S6.2 3.7 8 2Z"/></g></svg>
+              <span class="lang-name">{{.Lang.Name}}</span>
+              <span class="lang-code">{{.Lang.Code}}</span>
+              <svg class="chev" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="m4 6 4 4 4-4"/></svg>
+            </summary>
+            <div class="pop">
+              <p class="pop-title">{{.T.language}}</p>
+              <ul class="langs">
+                {{- range .LangMenu}}
+                <li><a href="{{.URL}}" hreflang="{{.Lang}}" lang="{{.Lang}}"{{if .Current}} aria-current="true"{{end}}>{{.Label}}</a></li>
+                {{- end}}
+              </ul>
+            </div>
+          </details>
+        </div>
       </div>
     </header>
 

@@ -1,6 +1,7 @@
 // bururu.dev: the menus and the search. The pages work without this
-// file: the menus still open and close on a click, only the search
-// needs it, so it stays hidden until this file shows it.
+// file: the menus still open and close on a click, they only lose the
+// place on the page when you switch. The search needs it, so it stays
+// hidden until this file shows it.
 "use strict";
 
 (() => {
@@ -9,12 +10,29 @@
   const input = box && box.querySelector("input");
   const list = box && box.querySelector(".results");
 
+  // The part of an address after /<version>/<language>/: the page.
+  const pageOf = (p) => p.split("/").slice(3).join("/");
+
+  // The version and language menus keep the place on the page: a link to
+  // the same page gets the heading in the address (#...), since headings
+  // have the same ids in every language.
+  function keepPlace(m) {
+    if (!m.matches(".menu-version, .menu-lang")) return;
+    const here = pageOf(location.pathname);
+    for (const a of m.querySelectorAll(".pop a")) {
+      const url = new URL(a.href);
+      url.hash = pageOf(url.pathname) === here ? location.hash : "";
+      a.href = url.href;
+    }
+  }
+
   // One menu open at a time; a click elsewhere or Escape closes it.
   for (const m of menus) {
     m.addEventListener("toggle", () => {
       if (!m.open) return;
       for (const other of menus) if (other !== m) other.open = false;
       hideResults();
+      keepPlace(m);
     });
   }
   document.addEventListener("click", (e) => {
