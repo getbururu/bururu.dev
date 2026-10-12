@@ -5,12 +5,13 @@
 //
 //	go run ./tools/sync -from ../bururu -version 0.14
 //
-// It copies docs/modding/*.md (README.md becomes index.md) and the pages
-// of docs/ that those pages link to (into player/). A link to a page it
-// does not copy becomes plain text, and a "Back to the ..." line that
-// points at such a page is left out. It also writes the page order to
-// content/<version>/pages.json and adds the version to
-// content/versions.json.
+// It copies docs/modding/*.md (README.md becomes index.md), the pages of
+// docs/ that those pages link to (into player/), and the pictures they
+// show. A link to a page it does not copy becomes plain text. The "Back to
+// the ..." line at the top of a page and HTML comments are left out: the
+// sidebar does the first job, and the comments are notes for the app's
+// developers. It also writes the page order to content/<version>/pages.json
+// and adds the version to content/versions.json.
 package main
 
 import (
@@ -34,6 +35,7 @@ func main() {
 	version := flag.String("version", "", "the app version the guide belongs to: 0.14, 0.14.13 or 0.14.13-test all give 0.14")
 	api := flag.String("api", "", "the mod API version; read from the guide when empty")
 	content := flag.String("content", "content", "the content folder of this site")
+	force := flag.Bool("force", false, "replace a docs version even when the guide now names another mod API for it")
 	flag.Parse()
 	if *from == "" || *version == "" {
 		flag.Usage()
@@ -43,7 +45,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	res, err := sync(os.DirFS(filepath.Join(*from, "docs")), *content, v, *api)
+	res, err := sync(os.DirFS(filepath.Join(*from, "docs")), *content, v, *api, *force)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -76,8 +78,9 @@ type result struct {
 }
 
 // sync reads the guide from docs (the app's docs folder) and writes it
-// into content/<v>/en.
-func sync(docs fs.FS, content, v, api string) (*result, error) {
+// into content/<v>/en. force lets it replace a version whose mod API
+// changed.
+func sync(docs fs.FS, content, v, api string, force bool) (*result, error) {
 	names, err := fs.Glob(docs, "modding/*.md")
 	if err != nil {
 		return nil, err
@@ -119,14 +122,34 @@ func sync(docs fs.FS, content, v, api string) (*result, error) {
 			dest[full] = contentPath(full)
 		}
 	}
+	// The pictures those pages show, wherever in docs/ they are.
+	pictures := map[string][]byte{} // content path -> the file
+	for n, text := range src {
+		for _, target := range linkTargets(text) {
+			p, _ := splitTarget(target)
+			if p == "" || isExternal(p) || !isPicture(p) {
+				continue
+			}
+			full := path.Clean(path.Join(path.Dir(n), p))
+			if _, ok := dest[full]; ok {
+				continue
+			}
+			if !fs.ValidPath(full) {
+				return nil, fmt.Errorf("%s shows the picture %s, which is outside docs/", n, p)
+			}
+			b, err := fs.ReadFile(docs, full)
+			if err != nil {
+				return nil, fmt.Errorf("%s shows the picture %s: %w", n, p, err)
+			}
+			dest[full] = contentPath(full)
+			pictures[dest[full]] = b
+		}
+	}
 
 	res := &result{}
 	out := map[string]string{}
 	for n, text := range src {
-		text = dropBackLines(text, func(target string) bool {
-			_, ok := resolve(n, target, dest)
-			return ok
-		})
+		text = stripComments(dropBackLines(text))
 		text = rewriteLinks(text, func(target string) (string, bool) {
 			p, frag := splitTarget(target)
 			if p == "" || isExternal(p) {
@@ -153,18 +176,30 @@ func sync(docs fs.FS, content, v, api string) (*result, error) {
 		}
 	}
 
+	versions := filepath.Join(content, "versions.json")
+	if err := checkAPI(versions, v, api, force); err != nil {
+		return nil, err
+	}
+
 	// Write the pages. Old ones go first, so a page the guide dropped
 	// leaves the site too.
 	enDir := filepath.Join(content, v, "en")
 	if err := os.RemoveAll(enDir); err != nil {
 		return nil, err
 	}
+	files := map[string][]byte{}
 	for p, text := range out {
+		files[p] = []byte(text)
+	}
+	for p, b := range pictures {
+		files[p] = b
+	}
+	for p, b := range files {
 		file := filepath.Join(enDir, filepath.FromSlash(p))
 		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 			return nil, err
 		}
-		if err := os.WriteFile(file, []byte(text), 0o644); err != nil {
+		if err := os.WriteFile(file, b, 0o644); err != nil {
 			return nil, err
 		}
 	}
@@ -173,10 +208,17 @@ func sync(docs fs.FS, content, v, api string) (*result, error) {
 	if err := writeJSON(filepath.Join(content, v, "pages.json"), map[string]any{"pages": res.pages}); err != nil {
 		return nil, err
 	}
-	if err := addVersion(filepath.Join(content, "versions.json"), v, api); err != nil {
+	if err := addVersion(versions, v, api); err != nil {
 		return nil, err
 	}
 	return res, nil
+}
+
+// The kinds of pictures a page can show.
+var pictureExt = map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".svg": true}
+
+func isPicture(p string) bool {
+	return pictureExt[strings.ToLower(path.Ext(p))]
 }
 
 // contentPath is where a page of the app's docs goes in content/<v>/en.
@@ -230,15 +272,16 @@ func relPath(from, to string) string {
 	return b.String()
 }
 
-var backLine = regexp.MustCompile(`^Back to the \[[^\]]*\]\(([^)\s]*)\)\.\s*$`)
+var backLine = regexp.MustCompile(`^Back to the \[[^\]]*\]\([^)\s]*\)\.\s*$`)
 
-// dropBackLines leaves out "Back to the [X](target)." lines whose target
-// the site does not carry, with the blank line after them.
-func dropBackLines(text string, carried func(target string) bool) string {
+// dropBackLines leaves out the "Back to the [X](target)." lines, with the
+// blank line after them. On the site the sidebar is the way back.
+func dropBackLines(text string) string {
 	lines := strings.Split(text, "\n")
 	var out []string
+	var fence codeFence
 	for i := 0; i < len(lines); i++ {
-		if m := backLine.FindStringSubmatch(lines[i]); m != nil && !carried(m[1]) {
+		if !fence.inCode(lines[i]) && backLine.MatchString(lines[i]) {
 			if i+1 < len(lines) && strings.TrimSpace(lines[i+1]) == "" {
 				i++
 			}
@@ -247,6 +290,78 @@ func dropBackLines(text string, carried func(target string) bool) string {
 		out = append(out, lines[i])
 	}
 	return strings.Join(out, "\n")
+}
+
+// stripComments leaves out HTML comments outside code blocks and code
+// spans. A line that held only a comment goes too, and so does the blank
+// line after it when the line before it is blank, so no gap is left.
+func stripComments(text string) string {
+	var out []string
+	var fence codeFence
+	inComment, skipBlank := false, false
+	for _, line := range strings.SplitAfter(text, "\n") {
+		if skipBlank {
+			skipBlank = false
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+		}
+		if !inComment && fence.inCode(line) {
+			out = append(out, line)
+			continue
+		}
+		stripped, still, cut := stripCommentsInLine(line, inComment)
+		inComment = still
+		if cut && strings.TrimSpace(stripped) == "" {
+			if len(out) == 0 || strings.TrimSpace(out[len(out)-1]) == "" {
+				skipBlank = true
+			}
+			continue
+		}
+		out = append(out, stripped)
+	}
+	return strings.Join(out, "")
+}
+
+// stripCommentsInLine takes the comments out of one line. in says whether
+// the line starts inside a comment, still whether it ends inside one, and
+// cut whether anything was taken out.
+func stripCommentsInLine(line string, in bool) (out string, still, cut bool) {
+	var b strings.Builder
+	i := 0
+	for i < len(line) {
+		if in {
+			end := strings.Index(line[i:], "-->")
+			if end < 0 {
+				return strings.TrimRight(b.String(), " \t"), true, true
+			}
+			i += end + len("-->")
+			in, cut = false, true
+			continue
+		}
+		switch {
+		case line[i] == '\\' && i+1 < len(line):
+			b.WriteString(line[i : i+2])
+			i += 2
+		case line[i] == '`':
+			end := codeSpanEnd(line, i)
+			b.WriteString(line[i:end])
+			i = end
+		case strings.HasPrefix(line[i:], "<!--"):
+			in, cut = true, true
+			i += len("<!--")
+		default:
+			b.WriteByte(line[i])
+			i++
+		}
+	}
+	s := b.String()
+	if cut {
+		// The spaces that stood before a comment at the end of the line.
+		body := strings.TrimRight(s, "\r\n")
+		s = strings.TrimRight(body, " \t") + s[len(body):]
+	}
+	return s, in, cut
 }
 
 // modAPI reads the mod API version from the sharing page: 'This Bururu
@@ -338,15 +453,42 @@ type version struct {
 	API string `json:"api,omitempty"`
 }
 
-// addVersion records v in versions.json, newest first. The newest
-// version is the current one.
-func addVersion(file, v, api string) error {
+func readVersions(file string) (versionsFile, error) {
 	var vf versionsFile
 	if b, err := os.ReadFile(file); err == nil {
 		if err := json.Unmarshal(b, &vf); err != nil {
-			return fmt.Errorf("%s: %w", file, err)
+			return vf, fmt.Errorf("%s: %w", file, err)
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
+		return vf, err
+	}
+	return vf, nil
+}
+
+// checkAPI stops a sync that would change the mod API of a docs version
+// the site already has. A docs version covers every patch release of the
+// app's minor version, so when a patch moves the mod API, players on the
+// earlier patch would read about mods their Bururu refuses.
+func checkAPI(file, v, api string, force bool) error {
+	vf, err := readVersions(file)
+	if err != nil || api == "" || force {
+		return err
+	}
+	for _, have := range vf.Versions {
+		if have.ID == v && have.API != "" && have.API != api {
+			return fmt.Errorf("the %s docs are for mod API %s, and this guide is for %s. "+
+				"A patch release changed the mod API, so these docs would no longer fit the earlier %s releases. "+
+				"Pass -force to replace them anyway", v, have.API, api, v)
+		}
+	}
+	return nil
+}
+
+// addVersion records v in versions.json, newest first. The newest
+// version is the current one.
+func addVersion(file, v, api string) error {
+	vf, err := readVersions(file)
+	if err != nil {
 		return err
 	}
 	found := false

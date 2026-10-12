@@ -7,25 +7,36 @@ import "strings"
 // target, or keep false to turn the link into its plain text.
 func rewriteLinks(text string, fn func(target string) (string, bool)) string {
 	var out strings.Builder
-	lines := strings.SplitAfter(text, "\n")
-	var fence string
-	for _, line := range lines {
-		f := fenceOf(line)
-		switch {
-		case fence == "" && f != "":
-			fence = f
-		case fence != "":
-			// A closing fence is the same character, at least as many
-			// times, and nothing after it.
-			if f != "" && f[0] == fence[0] && len(f) >= len(fence) && strings.TrimSpace(line) == f {
-				fence = ""
-			}
-		default:
+	var fence codeFence
+	for _, line := range strings.SplitAfter(text, "\n") {
+		if !fence.inCode(line) {
 			line = rewriteLine(line, fn)
 		}
 		out.WriteString(line)
 	}
 	return out.String()
+}
+
+// codeFence follows the fenced code blocks of a text, line by line.
+type codeFence struct{ open string }
+
+// inCode says whether line belongs to a fenced code block, its fences
+// included.
+func (c *codeFence) inCode(line string) bool {
+	f := fenceOf(line)
+	switch {
+	case c.open == "" && f != "":
+		c.open = f
+		return true
+	case c.open != "":
+		// A closing fence is the same character, at least as many times,
+		// and nothing after it.
+		if f != "" && f[0] == c.open[0] && len(f) >= len(c.open) && strings.TrimSpace(line) == f {
+			c.open = ""
+		}
+		return true
+	}
+	return false
 }
 
 // linkTargets lists the targets of the inline links in a Markdown text.
