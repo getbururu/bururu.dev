@@ -1,0 +1,21 @@
+{
+  "pages": [
+    "index",
+    "quickstart-data",
+    "quickstart-lua",
+    "quickstart-udp",
+    "quickstart-sound",
+    "quickstart-addon",
+    "rules",
+    "sensors",
+    "layouts",
+    "feels",
+    "reaper",
+    "testing",
+    "sharing",
+    "publishing",
+    "lua-api",
+    "files",
+    "player/feel"
+  ]
+}
