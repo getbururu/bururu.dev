@@ -1,7 +1,5 @@
 # Sharing a mod
 
-Back to the [modding guide](index.md).
-
 What a mod needs once other people use it: the manifest, the pages players see, permissions, add-ons and updates. Every field is in the [file reference](files.md). Releasing a mod and listing it: [Publishing a mod](publishing.md).
 
 ## The manifest

@@ -19,9 +19,9 @@ In a game without a mod, Bururu can listen to the game's sound and turn it into 
 
 Both follow the game's own level, so they feel the same at any game volume. In Follow the game's usual level is taken from the last 3 seconds of its sound, so a single hit or a short pause does not change it and a footstep stays smaller than an explosion. After a lasting change, such as from a menu into a fight, it settles within 2 to 4 seconds.
 
-- **Off at first.** Turn them on for one game on its page, under **Sound haptics**, or for every game without a mod on the **Controller** page under **Sound haptics**, where the mode and their other settings are. Both say whether Bururu listens now, and why not when it does not. To try them for one run: quit the Bururu in the tray, then run `.\brr -console -soundhaptics -verbose`, which prints each push, or in Follow how the signal goes once a second. Their settings: Sound haptics.
+- **Off at first.** Turn them on for one game on its page, under **Sound haptics**, or for every game without a mod on the **Controller** page under **Sound haptics**, where the mode and their other settings are. Both say whether Bururu listens now, and why not when it does not. To try them for one run: quit the Bururu in the tray, then run `.\brr -console -soundhaptics -verbose`. With `-verbose` it prints each push in Impacts, and in Follow the signal's peak and level once a second.
 - **Which games**: the games the mod list has a profile for, while no game mod runs here, and a program you name for one run with `-soundgame`. A game's entry in `games` turns them on or off for that game.
-- **When**: while Bururu holds the controller in your hands. With the effects paused, with a game that reads the DualSense itself (Direct), or with a game that plays haptics of its own, they stay off.
+- **When**: while Bururu has the controller. With the effects paused, with a game that reads the DualSense itself (Direct), or with a game that plays haptics of its own, they stay off.
 - **Strength** scales them like every other effect, and the same limit holds. In Follow, a Strength over 100% makes the quieter parts stronger, while the strongest parts stay where they are at 100%, since more would distort and Bluetooth would compress them. On a controller without HD haptics, or with **Mode: Rumble**, they play on the motors: in Follow the motors follow the signal's strength, the big one its deep bass, and stay still while it is faint.
 - **Windows 11 only**: Windows 10 cannot share one game's sound. On Linux and macOS they stay off too.
 - In a game with surround sound, Follow takes the main channels and the low-effects (LFE, subwoofer) channel together. Impacts listens to the LFE channel alone, where explosions and hits are and music and speech mostly are not; the log says so.
@@ -45,9 +45,9 @@ A game mod gives R2 and L2 an effect for each situation, such as a click while y
 | **Wall by position** | A resistance for each of the 10 positions | `MULTIPLE_POSITION_FEEDBACK` |
 | **Rattle by position** | A vibration for each of the 10 positions | `MULTIPLE_POSITION_VIBRATION` |
 
-On an Xbox One or Xbox Series controller on Windows the effects play on its trigger motors instead, as short pushes and soft ticks, see Trigger motors.
+On an Xbox One or Xbox Series controller on Windows the effects play on its trigger motors instead, as short pushes and soft ticks. How hard they push, and whether they tick, you set under **More** in that controller's settings on the **Controller** page.
 
-**Exact values** on a card shows every value of the effect, the by-position feels too, and **Back to default**. The values in the settings file: Trigger modes.
+**Exact values** on a card shows every value of the effect, the by-position feels too, and **Back to default**.
 
 **Try on R2** (or L2, or both) plays the card's effect for 2 seconds, then frees the trigger. It works while Bururu has the controller and no game drives it: with no game running, in a game's menu, or with the effects paused. It needs **Adaptive triggers** on. When it cannot play, a line under the button says why.
 

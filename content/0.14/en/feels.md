@@ -1,7 +1,5 @@
 # Feels
 
-Back to the [modding guide](index.md).
-
 A feel is what the haptics play: a click, a swell, a rattle. On the cable it plays on the two haptic actuators as a waveform; on Bluetooth the same waveform at a lower rate; on a controller with rumble only, on the motors. A mod plays a feel by name. Bururu mixes every feel that plays, applies the player's effect levels and **Strength**, and keeps the sum from distorting.
 
 Each feel is one file, `feels/<name>.feel.json`. Every field is in the [file reference](files.md#feel). To design feels by ear: [Feels in REAPER](reaper.md).

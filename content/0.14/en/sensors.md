@@ -1,7 +1,5 @@
 # Sensors
 
-Back to the [modding guide](index.md).
-
 A sensor is Bururu code that reads something for a mod: a game's files, the screen, its control preset, network packets, the game's own sound, what it sends to its controller, and for some games their memory. A mod reads nothing itself. It declares the sensors it needs in `sensors.json`, and gets what they read in two ways:
 
 - An **input** is one thing that happened, delivered once: `state:change`, `telemetry:gear_change`. Its name is the sensor's id, a colon, and what happened. Rules wait for inputs with `on`, Lua with `bururu.on`.
@@ -64,7 +62,6 @@ On Linux, for a game that runs through Proton or Wine, the Windows folders are t
 
 Every field of a declaration:
 
-<!-- generated: sensor fields -->
 | Field | Type | What it is |
 |---|---|---|
 | `bind` | string | udp.listen: the address to bind. |
@@ -130,8 +127,6 @@ Every field of a declaration:
 | `values.*.type` | one of u8, i32, u32, i64, f32, f64, bool, string | What it is. |
 | `when` | one of game.running, window.in_front | A condition that gates the sensor. |
 | `window` | string | screen: the game key whose window it captures. |
-
-<!-- end of generated part -->
 
 ## The game
 

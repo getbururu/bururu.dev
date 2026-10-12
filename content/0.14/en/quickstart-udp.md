@@ -1,7 +1,5 @@
 # A racing game over UDP
 
-Back to the [modding guide](index.md).
-
 Many racing games send telemetry while you drive: small UDP packets, many times a second, with the speed, the gear, the pedals and what each wheel touches. The `udp` template reads them and plays a clunk on each gear change, ridges while a wheel is on a kerb and a thump on a collision, and puts resistance on L2 for braking.
 
 The template reads Racer, a made-up game, and ships a recording of its packets, so you can try everything but the last step without a game. For your game, you change the layout to its packets.

@@ -1,7 +1,5 @@
 # A mod in Lua
 
-Back to the [modding guide](index.md).
-
 The `lua` template is the [data template](quickstart-data.md)'s mod with its logic in Lua: a small state machine that knows "calm", "alarm", and two seconds of "cooling" after an alarm. Use Lua when a moment depends on what came before: a timer, a count, a value that rises and falls. A mod can mix rules and Lua, see [When to use Lua](rules.md#when-to-use-lua).
 
 ## Make it

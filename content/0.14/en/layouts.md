@@ -1,7 +1,5 @@
 # Binary layouts
 
-Back to the [modding guide](index.md).
-
 A racing game's telemetry comes as UDP packets: rows of bytes, each value at a known offset. A layout file (`layouts/<name>.layout.json`) says which bytes are which value, so a `udp.listen` sensor can decode them. Rules and Lua only see the numbers.
 
 Declare only the fields you use. The game's published UDP format gives the offsets and types. The [udp template](quickstart-udp.md) has a whole layout. Every field is in the [file reference](files.md#layout).

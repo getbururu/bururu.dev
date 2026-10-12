@@ -1,7 +1,5 @@
 # An add-on
 
-Back to the [modding guide](index.md).
-
 An add-on changes another mod without copying it. It names only what it changes, so it keeps working when that mod updates, and it works beside other add-ons. The `addon` template, "Softer taps", changes the [data template](quickstart-data.md)'s mod three ways:
 
 - taps play softer: a patch on one voice of the `tap` feel;

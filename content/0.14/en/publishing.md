@@ -1,7 +1,5 @@
 # Publishing a mod
 
-Back to the [modding guide](index.md).
-
 Players get your mod from **Browse** on the **Mods** page once it is in Bururu's mod list, or with **Install from file...** from a `.brr` you publish. This chapter covers both: a repo of the mod's own, releases, and the list.
 
 The list is [getbururu/mod-index](https://github.com/getbururu/mod-index). It holds one small file per mod; each mod stays in its author's repo. The list checks every new release, a maintainer reviews it, and Bururu reads the published list. Bururu installs nothing by itself: the player clicks **Install**, and updates wait for the player's click.

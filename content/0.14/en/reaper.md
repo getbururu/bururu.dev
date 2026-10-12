@@ -1,7 +1,5 @@
 # Feels in REAPER
 
-Back to the [modding guide](index.md).
-
 On its cable, a DualSense is also a 4-channel audio device, and channels 3 and 4 drive its two haptic actuators. So you can design a feel in [REAPER](https://www.reaper.fm/) like any sound, feel it in your hands while you change it, and import it into your mod as feel files. You can also write feel files by hand, see [Feels](feels.md).
 
 ## The kit

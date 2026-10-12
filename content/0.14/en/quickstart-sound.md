@@ -1,7 +1,5 @@
 # Sounds of a game
 
-Back to the [modding guide](index.md).
-
 Many moments of a game have a sound of their own: a pickup, a reload, an alarm, a menu click, a low-health warning. A game plays the same sound each time, so Bururu can find it in the game's sound and give the mod an input, and the mod plays a feel you designed. Such a mod needs no file or packet from the game, and often no Lua: a few prints of the game's sounds and a rule for each.
 
 The `sound` template is such a mod. It knows one sound, a chime it made itself, and plays a short push when it hears it. For your game, you record the game, cut out its sounds and make their prints.

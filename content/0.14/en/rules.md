@@ -1,7 +1,5 @@
 # Rules
 
-Back to the [modding guide](index.md).
-
 Most of a mod is data: rules that play a feel when something happens, layers that play while something holds, and tables for the lights and triggers. Conditions are small Lua expressions. Every field is in the [file reference](files.md#rules).
 
 ## Rules files

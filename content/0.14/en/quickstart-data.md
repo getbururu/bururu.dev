@@ -1,7 +1,5 @@
 # The data template
 
-Back to the [modding guide](index.md).
-
 The [quick start](index.md#quick-start) made a mod from the `data` template. This page shows how its files work: what it reads, how it decides, and what it shows. It has no Lua; most mods need none.
 
 ```

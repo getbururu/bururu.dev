@@ -1,7 +1,5 @@
 # Testing
 
-Back to the [modding guide](index.md).
-
 You can test a mod without the game and without the controller. `mod check` reads every file as Bururu does. A recording holds what the sensors read during some play; `mod replay` plays it through the mod and compares what the mod does with an expect file. So after a change you know at once whether the mod still does what it did.
 
 ## Checking a mod
