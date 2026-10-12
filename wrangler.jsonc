@@ -1,0 +1,12 @@
+{
+  // For Cloudflare Workers with static assets (Workers Builds): the site is
+  // the files in public/, served as they are. _headers and _redirects in
+  // public/ apply the same way as on Cloudflare Pages.
+  "name": "bururu-dev",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  }
+}
