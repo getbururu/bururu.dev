@@ -1,0 +1,27 @@
+# Runs the tests and builds the site on every push and pull request, so a
+# translation with a broken link shows up before it is merged. Cloudflare
+# Pages does the deploy itself; this workflow deploys nothing.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: test -z "$(gofmt -l .)" || { gofmt -l .; echo "run gofmt -w on the files above"; exit 1; }
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go run ./tools/build
