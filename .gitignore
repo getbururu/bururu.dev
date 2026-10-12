@@ -1,0 +1,2 @@
+# Made by go run ./tools/build; Cloudflare Pages builds it on every push.
+/public/

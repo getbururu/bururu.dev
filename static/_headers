@@ -1,0 +1,23 @@
+# Response headers for Cloudflare Pages. Pages reads this file and does not
+# serve it. Syntax: https://developers.cloudflare.com/pages/configuration/headers/
+#
+# The site loads nothing from other hosts. Its one script, /assets/site.js,
+# runs the menus and the search, and the search reads search.json from
+# the site itself (connect-src). Pages have no inline scripts or styles.
+# If you ever add a script, a font or a file from another host, add it to
+# the policy, or browsers will block it.
+
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), hid=(), magnetometer=(), microphone=(), payment=(), serial=(), usb=(), browsing-topics=()
+  Cross-Origin-Opener-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000
+
+# Keep preview deployments on pages.dev out of search engines.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex

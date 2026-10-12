@@ -1,0 +1,189 @@
+package main
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+	"testing/fstest"
+)
+
+func TestDocsVersion(t *testing.T) {
+	for in, want := range map[string]string{
+		"0.14":         "0.14",
+		"0.14.13":      "0.14",
+		"0.14.13-test": "0.14",
+		"v0.7.7":       "0.7",
+		"1.2.0+build5": "1.2",
+		" 0.15 ":       "0.15",
+	} {
+		got, err := docsVersion(in)
+		if err != nil || got != want {
+			t.Errorf("docsVersion(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"", "dev", "14", "0.x"} {
+		if _, err := docsVersion(in); err == nil {
+			t.Errorf("docsVersion(%q) gave no error", in)
+		}
+	}
+}
+
+func TestRewriteLinksSkipsCode(t *testing.T) {
+	in := "See [rules](rules.md) and `[not](a.md)`.\n\n```\n[not](b.md)\n```\n\n~~~~\n```\n[not](c.md)\n~~~~\n\n[x](d.md \"title\") ![pic](e.png)\n"
+	got := linkTargets(in)
+	want := []string{"rules.md", "d.md", "e.png"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("linkTargets = %q, want %q", got, want)
+	}
+}
+
+func TestRewriteLinksToText(t *testing.T) {
+	in := "Go to [the **settings**](settings.md#x) or [`rules`](rules.md).\n"
+	got := rewriteLinks(in, func(target string) (string, bool) {
+		if strings.HasPrefix(target, "settings.md") {
+			return "", false
+		}
+		return "new/" + target, true
+	})
+	want := "Go to the **settings** or [`rules`](new/rules.md).\n"
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+func TestRelPath(t *testing.T) {
+	for _, c := range [][3]string{
+		{"index.md", "rules.md", "rules.md"},
+		{"index.md", "player/feel.md", "player/feel.md"},
+		{"player/feel.md", "rules.md", "../rules.md"},
+		{"player/feel.md", "player/settings.md", "settings.md"},
+		{"a/b/c.md", "a/d.md", "../d.md"},
+	} {
+		if got := relPath(c[0], c[1]); got != c[2] {
+			t.Errorf("relPath(%q, %q) = %q, want %q", c[0], c[1], got, c[2])
+		}
+	}
+}
+
+// guide is a small app docs folder: the modding guide and two player
+// pages, one the guide links to and one it does not.
+func guide() fstest.MapFS {
+	return fstest.MapFS{
+		"modding/README.md":  {Data: []byte("# Making mods\n\nBack to the [README](../../README.md).\n\nIntro, with [sound haptics](../feel.md#sound-haptics) and [a rule](rules.md#rules-files).\n\n## Chapters\n\n- [Sharing a mod](sharing.md)\n- [Rules](rules.md)\n\n## More\n\n[Testing](testing.md)\n")},
+		"modding/rules.md":   {Data: []byte("# Rules\n\nBack to the [modding guide](README.md).\n\n## Rules files\n\n```\n[keep](README.md)\n```\n")},
+		"modding/sharing.md": {Data: []byte("# Sharing a mod\n\nBack to the [modding guide](README.md).\n\n- `api`: This Bururu speaks `\"0.12\"` and still loads older ones.\n")},
+		"modding/testing.md": {Data: []byte("# Testing\n\nSee [Rules](rules.md).\n")},
+		"feel.md":            {Data: []byte("# Effects\n\nBack to the [README](../README.md).\n\n## Sound haptics\n\nTheir settings: [Sound haptics](settings.md#sound-haptics). See [Rules](modding/rules.md).\n")},
+		"settings.md":        {Data: []byte("# Settings\n")},
+	}
+}
+
+func TestSync(t *testing.T) {
+	content := t.TempDir()
+	res, err := sync(guide(), content, "0.14", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPages := []string{"index", "sharing", "rules", "testing", "player/feel"}
+	if !reflect.DeepEqual(res.pages, wantPages) {
+		t.Errorf("pages = %q, want %q", res.pages, wantPages)
+	}
+
+	read := func(p string) string {
+		b, err := os.ReadFile(filepath.Join(content, "0.14", "en", filepath.FromSlash(p)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	index := read("index.md")
+	if strings.Contains(index, "Back to the [README]") {
+		t.Error("index.md still links back to the app's README")
+	}
+	if !strings.HasPrefix(index, "# Making mods\n\nIntro, with [sound haptics](player/feel.md#sound-haptics) and [a rule](rules.md#rules-files).") {
+		t.Errorf("index.md starts:\n%s", index[:min(len(index), 200)])
+	}
+	rules := read("rules.md")
+	if !strings.Contains(rules, "Back to the [modding guide](index.md).") {
+		t.Errorf("rules.md: the link back to the guide should go to index.md:\n%s", rules)
+	}
+	if !strings.Contains(rules, "[keep](README.md)") {
+		t.Error("rules.md: a link inside a code block changed")
+	}
+	feel := read("player/feel.md")
+	if strings.Contains(feel, "Back to the") {
+		t.Error("player/feel.md still has its back line")
+	}
+	if !strings.Contains(feel, "Their settings: Sound haptics. See [Rules](../rules.md).") {
+		t.Errorf("player/feel.md links:\n%s", feel)
+	}
+	if _, err := os.Stat(filepath.Join(content, "0.14", "en", "player", "settings.md")); err == nil {
+		t.Error("settings.md was copied, but only the guide links count")
+	}
+	if len(res.warnings) != 1 || !strings.Contains(res.warnings[0], "settings.md") {
+		t.Errorf("warnings = %q, want one about settings.md", res.warnings)
+	}
+
+	var vf versionsFile
+	b, _ := os.ReadFile(filepath.Join(content, "versions.json"))
+	if err := json.Unmarshal(b, &vf); err != nil {
+		t.Fatal(err)
+	}
+	if vf.Current != "0.14" || len(vf.Versions) != 1 || vf.Versions[0].API != "0.12" {
+		t.Errorf("versions.json = %+v", vf)
+	}
+
+	// A second sync replaces the pages: a page the guide dropped goes.
+	g := guide()
+	delete(g, "modding/testing.md")
+	g["modding/README.md"] = &fstest.MapFile{Data: []byte("# Making mods\n\n## Chapters\n\n- [Rules](rules.md)\n")}
+	if _, err := sync(g, content, "0.14", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(content, "0.14", "en", "testing.md")); err == nil {
+		t.Error("testing.md is still there after the guide dropped it")
+	}
+}
+
+func TestSyncRefusesPrivatePaths(t *testing.T) {
+	g := guide()
+	g["modding/testing.md"] = &fstest.MapFile{Data: []byte("# Testing\n\nRun `C:\\Users\\someone\\bururu\\brr.exe`.\n")}
+	_, err := sync(g, t.TempDir(), "0.14", "")
+	if err == nil || !strings.Contains(err.Error(), "modding/testing.md:3") {
+		t.Errorf("err = %v, want one for modding/testing.md:3", err)
+	}
+}
+
+func TestAddVersion(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "versions.json")
+	steps := []struct{ v, api, current string }{
+		{"0.14", "0.12", "0.14"},
+		{"0.13", "0.11", "0.14"}, // an older version does not take over
+		{"0.15", "", "0.15"},
+		{"0.14", "", "0.15"}, // syncing 0.14 again keeps its api
+	}
+	for _, s := range steps {
+		if err := addVersion(file, s.v, s.api); err != nil {
+			t.Fatal(err)
+		}
+		var vf versionsFile
+		b, _ := os.ReadFile(file)
+		json.Unmarshal(b, &vf)
+		if vf.Current != s.current {
+			t.Errorf("after %s: current = %s, want %s", s.v, vf.Current, s.current)
+		}
+	}
+	var vf versionsFile
+	b, _ := os.ReadFile(file)
+	json.Unmarshal(b, &vf)
+	want := []version{{"0.15", ""}, {"0.14", "0.12"}, {"0.13", "0.11"}}
+	if !reflect.DeepEqual(vf.Versions, want) {
+		t.Errorf("versions = %+v, want %+v", vf.Versions, want)
+	}
+	if !newer("0.10", "0.9") || newer("0.9", "0.10") || !newer("1.0", "0.99") {
+		t.Error("newer compares as text, not as numbers")
+	}
+}
