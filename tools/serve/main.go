@@ -1,6 +1,6 @@
 // Command serve shows the built site on this PC the way Cloudflare Pages
 // serves it, close enough to check pages before a deploy: clean URLs
-// (/0.14/en/rules/ for 0.14/en/rules/index.html, /x for x.html), the
+// (/0.14/rules/ for 0.14/rules/index.html, /x for x.html), the
 // nearest 404.html up the tree for missing pages, and the rules in
 // _headers and _redirects. It reads both files on every request, so a new
 // build shows without a restart.

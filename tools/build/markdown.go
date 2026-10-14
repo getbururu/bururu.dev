@@ -35,11 +35,10 @@ func newMarkdown() goldmark.Markdown {
 	)
 }
 
-// parsePage parses a page and gives its headings their ids. A translation
-// (en is its English page) takes the English ids when it has the same
-// headings at the same levels, so links into it keep working.
-func parsePage(md goldmark.Markdown, id, lang, file string, src []byte, en *page) (*page, error) {
-	p := &page{id: id, lang: lang, file: file, src: src, ids: map[string]bool{}}
+// parsePage parses a page and gives its headings their ids, the way
+// GitHub does, or the one written after a heading as {#id}.
+func parsePage(md goldmark.Markdown, id, file string, src []byte) (*page, error) {
+	p := &page{id: id, file: file, src: src, ids: map[string]bool{}}
 	p.doc = md.Parser().Parse(text.NewReader(src))
 
 	var nodes []*ast.Heading
@@ -65,22 +64,11 @@ func parsePage(md goldmark.Markdown, id, lang, file string, src []byte, en *page
 		return nil, err
 	}
 
-	sameShape := en != nil && len(en.heads) == len(nodes)
-	if sameShape {
-		for i, n := range nodes {
-			if en.heads[i].level != n.Level {
-				sameShape = false
-				break
-			}
-		}
-	}
 	counts := map[string]int{}
-	for i, n := range nodes {
+	for _, n := range nodes {
 		h := heading{level: n.Level, text: plainText(n, src)}
 		if v, ok := n.AttributeString("id"); ok {
 			h.id = stringOf(v)
-		} else if sameShape {
-			h.id = en.heads[i].id
 		} else {
 			h.id = slug(h.text)
 		}
@@ -180,13 +168,13 @@ func isExternal(dest string) bool {
 	return schemeRe.MatchString(dest) || strings.HasPrefix(dest, "//")
 }
 
-// resolveLinks sets every link of p to its address on the site, for the
-// page as it shows in lang. It returns what does not resolve.
-func (v *docVersion) resolveLinks(p *page, lang string) []string {
+// resolveLinks sets every link of p to its address on the site. It
+// returns what does not resolve.
+func (v *docVersion) resolveLinks(p *page) []string {
 	var errs []string
 	for i, l := range p.links {
 		dest := string(p.dests[i])
-		to, err := v.linkTarget(p, lang, dest)
+		to, err := v.linkTarget(p, dest)
 		if err != "" {
 			errs = append(errs, fmt.Sprintf("%s: the link to %q %s", p.file, dest, err))
 			to = dest
@@ -197,16 +185,15 @@ func (v *docVersion) resolveLinks(p *page, lang string) []string {
 }
 
 // linkTarget turns a link as written in a page into its address on the
-// site: rules.md#event-rules becomes /0.14/fr/rules/#event-rules on a
-// French page. err says why a link does not work.
-func (v *docVersion) linkTarget(p *page, lang, dest string) (to, err string) {
+// site: rules.md#event-rules becomes /0.14/rules/#event-rules. err says
+// why a link does not work.
+func (v *docVersion) linkTarget(p *page, dest string) (to, err string) {
 	if dest == "" || isExternal(dest) {
 		return dest, ""
 	}
 	file, frag, _ := strings.Cut(dest, "#")
-	shown, _ := v.show(lang, p.id)
 	if file == "" {
-		if frag != "" && !shown.ids[frag] {
+		if frag != "" && !p.ids[frag] {
 			return "", "goes to a heading this page does not have"
 		}
 		return dest, ""
@@ -221,13 +208,9 @@ func (v *docVersion) linkTarget(p *page, lang, dest string) (to, err string) {
 	if !v.has(id) {
 		return "", "goes to a page that does not exist"
 	}
-	to = pageURL(v.id, lang, id)
+	to = pageURL(v.id, id)
 	if frag != "" {
-		target, translated := v.show(lang, id)
-		if !target.ids[frag] {
-			if translated && lang != "en" {
-				return "", fmt.Sprintf("goes to a heading %s does not have: give that heading the English id, as in \"## Heading {#%s}\"", target.file, frag)
-			}
+		if !v.pages[id].ids[frag] {
 			return "", "goes to a heading that page does not have"
 		}
 		to += "#" + frag
@@ -236,17 +219,16 @@ func (v *docVersion) linkTarget(p *page, lang, dest string) (to, err string) {
 }
 
 // The kinds of pictures a page can show. They sit next to the pages, in
-// content/<version>/<lang>/, and the build copies them into the site.
+// content/<version>/, and the build copies them into the site.
 var pictureExt = map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".svg": true}
 
 func isPicture(name string) bool {
 	return pictureExt[strings.ToLower(path.Ext(name))]
 }
 
-// picture finds the picture that dest, written in page p, points at: in
-// the folder of p's language, or else in the English one, so a
-// translation can show the English pictures. It returns its address on
-// the site, or why it does not work.
+// picture finds the picture that dest, written in page p, points at, in
+// the version's folder. It returns its address on the site, or why it
+// does not work.
 func (v *docVersion) picture(p *page, dest string) (to, err string) {
 	name := dest
 	if u, e := url.PathUnescape(dest); e == nil {
@@ -257,18 +239,15 @@ func (v *docVersion) picture(p *page, dest string) (to, err string) {
 	}
 	rel := path.Clean(path.Join(path.Dir(p.id), name))
 	if rel == ".." || strings.HasPrefix(rel, "../") {
-		return "", "goes outside the language's folder"
+		return "", "goes outside the version's folder"
 	}
-	for _, lang := range []string{p.lang, "en"} {
-		if _, ok := v.pictures[lang][rel]; ok {
-			return (&url.URL{Path: "/" + v.id + "/" + lang + "/" + rel}).EscapedPath(), ""
-		}
+	if _, ok := v.pictures[rel]; ok {
+		return (&url.URL{Path: "/" + v.id + "/" + rel}).EscapedPath(), ""
 	}
 	return "", "goes to a picture that is not there"
 }
 
-// render turns a parsed page into HTML, for the language its links were
-// last resolved for.
+// render turns a parsed page into HTML.
 func render(md goldmark.Markdown, p *page) (string, error) {
 	var buf bytes.Buffer
 	if err := md.Renderer().Render(&buf, p.src, p.doc); err != nil {
@@ -322,7 +301,7 @@ func renderCode(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast
 	if f, ok := node.(*ast.FencedCodeBlock); ok {
 		lang = strings.ToLower(string(f.Language(src)))
 	}
-	w.WriteString(`<pre class="code" tabindex="0" dir="ltr"><code`)
+	w.WriteString(`<pre class="code" tabindex="0"><code`)
 	if lang != "" {
 		fmt.Fprintf(w, ` class="language-%s"`, html.EscapeString(lang))
 	}
@@ -336,20 +315,6 @@ func renderCode(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast
 // names (k for a keyword, s2 for a string); site.css colours them.
 // Code in a language chroma does not know stays plain.
 func highlight(lang, code string) string {
-	key := lang + "\n" + code
-	if out, ok := highlighted[key]; ok {
-		return out
-	}
-	out := highlightCode(lang, code)
-	highlighted[key] = out
-	return out
-}
-
-// highlighted keeps what highlight made: each page is made once per
-// language, mostly with the same code blocks.
-var highlighted = map[string]string{}
-
-func highlightCode(lang, code string) string {
 	if name, ok := lexerNames[lang]; ok {
 		lang = name
 	}

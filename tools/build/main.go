@@ -6,9 +6,8 @@
 //	go run ./tools/build
 //	go run ./tools/build -content content -static static -out public
 //
-// Every page exists for every version and every language. A page with no
-// translation shows the English one, with a note at the top. A broken
-// link or a link to a heading that is not there stops the build.
+// Each version's pages go to /<version>/<page>/. A broken link or a link
+// to a heading that is not there stops the build.
 package main
 
 import (

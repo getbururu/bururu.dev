@@ -1,6 +1,6 @@
 # Runs the tests and builds the site on every push and pull request, so a
-# translation with a broken link shows up before it is merged. Cloudflare
-# Pages does the deploy itself; this workflow deploys nothing.
+# page with a broken link shows up before it is merged. Cloudflare Pages
+# does the deploy itself; this workflow deploys nothing.
 name: check
 
 on:

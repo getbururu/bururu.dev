@@ -151,8 +151,8 @@ img, svg { display: block; }
 }
 .brand picture { flex-shrink: 0; }
 .brand img { width: 131px; height: 28px; }
-/* the site's name in the language of the page: next to the logo in the
-   bar, under it in the sidebar, where a long name would not fit beside it */
+/* the site's name: next to the logo in the bar, under it in the sidebar,
+   where it would not fit beside it */
 .brand-name {
   min-width: 0;
   padding-inline-start: 12px;
@@ -229,7 +229,7 @@ img, svg { display: block; }
 
 .column { min-width: 0; display: flex; flex-direction: column; }
 
-/* ---------- the bar over the page: search, version, language ---------- */
+/* ---------- the bar over the page: search and version ---------- */
 
 .bar {
   display: flex;
@@ -246,7 +246,7 @@ img, svg { display: block; }
   flex-grow: 1;
   min-width: 0;
 }
-/* the version and language menus, side by side at the bar's end */
+/* the version menu, at the bar's end */
 .pick {
   display: flex;
   align-items: center;
@@ -282,10 +282,6 @@ img, svg { display: block; }
 .menu > summary svg { flex-shrink: 0; color: var(--text-2); }
 .chev { transition: transform 120ms cubic-bezier(.2, 0, 0, 1); }
 .menu[open] .chev { transform: rotate(180deg); }
-.lang-name { max-width: 11rem; overflow: hidden; text-overflow: ellipsis; }
-/* on phones the language menu shows the code, such as PT-BR, in place of
-   the name */
-.lang-code { display: none; text-transform: uppercase; }
 
 .pop {
   position: absolute;
@@ -322,8 +318,6 @@ img, svg { display: block; }
   font-weight: 600;
 }
 .item-note { color: var(--text-3); font-size: .75rem; line-height: 1rem; font-weight: 400; }
-.langs { columns: 2; column-gap: 4px; min-width: 22rem; }
-.langs li { break-inside: avoid; }
 .menu-pages .pop { inset-inline-start: 0; inset-inline-end: auto; min-width: 17rem; }
 .menu-pages .nav-group { margin: 12px 10px 4px; }
 .menu-pages .nav-group:first-child { margin-top: 4px; }
@@ -392,7 +386,6 @@ main { flex-grow: 1; padding: 8px var(--page-x) 56px; }
 .doc h2 { margin: 2.75rem 0 .75rem; font-size: 1.375rem; line-height: 1.875rem; font-weight: 600; }
 .doc h3 { margin: 2rem 0 .5rem; font-size: 1.0625rem; line-height: 1.5rem; font-weight: 600; }
 .doc h4 { margin: 1.5rem 0 .5rem; font-size: 1rem; font-weight: 600; }
-.doc :is(h1, h2, h3, h4):lang(ar) { letter-spacing: 0; }
 
 .anchor {
   margin-inline-start: .35em;
@@ -420,7 +413,7 @@ main { flex-grow: 1; padding: 8px var(--page-x) 56px; }
 .doc hr { margin: 2rem 0; border: 0; border-top: 1px solid var(--line-2); }
 .doc img { max-width: 100%; height: auto; border-radius: var(--r-md); }
 
-/* code: always left to right, also on an Arabic page */
+/* code */
 code, pre { font-family: var(--mono); }
 .doc code {
   padding: .1em .35em;
@@ -428,8 +421,6 @@ code, pre { font-family: var(--mono); }
   border-radius: var(--r-xs);
   background: var(--code-inline);
   font-size: .875em;
-  direction: ltr;
-  unicode-bidi: isolate;
 }
 .doc pre.code {
   padding: 14px 16px;
@@ -524,8 +515,8 @@ code, pre { font-family: var(--mono); }
   .side { display: none; }
   .bar { flex-wrap: wrap; row-gap: 10px; padding-block: 8px 16px; }
   .bar .brand { display: flex; height: 48px; padding-inline: 0; }
-  /* the page menu, then the version and language menus, on one row; the
-     search under them */
+  /* the page menu and the version menu on one row, the search under
+     them */
   .tools {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -539,8 +530,6 @@ code, pre { font-family: var(--mono); }
 }
 @media (max-width: 599px) {
   :root { --page-x: 16px; }
-  .lang-name { display: none; }
-  .lang-code { display: inline; }
   /* the lists open under the row of menus, as wide as the page, so none
      runs past the screen's edge */
   .tools { position: relative; }
@@ -551,7 +540,6 @@ code, pre { font-family: var(--mono); }
     min-width: 0;
     max-width: none;
   }
-  .langs { min-width: 0; }
   .results { width: auto; inset-inline: 0; }
   .doc h2 { font-size: 1.25rem; line-height: 1.75rem; }
   .doc pre.code { font-size: .75rem; padding: 12px; }

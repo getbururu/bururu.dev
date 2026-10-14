@@ -10,14 +10,13 @@
   const input = box && box.querySelector("input");
   const list = box && box.querySelector(".results");
 
-  // The part of an address after /<version>/<language>/: the page.
-  const pageOf = (p) => p.split("/").slice(3).join("/");
+  // The part of an address after /<version>/: the page.
+  const pageOf = (p) => p.split("/").slice(2).join("/");
 
-  // The version and language menus keep the place on the page: a link to
-  // the same page gets the heading in the address (#...), since headings
-  // have the same ids in every language.
+  // The version menu keeps the place on the page: a link to the same page
+  // in another version gets the heading in the address (#...).
   function keepPlace(m) {
-    if (!m.matches(".menu-version, .menu-lang")) return;
+    if (!m.matches(".menu-version")) return;
     const here = pageOf(location.pathname);
     for (const a of m.querySelectorAll(".pop a")) {
       const url = new URL(a.href);

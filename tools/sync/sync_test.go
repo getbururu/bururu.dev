@@ -84,6 +84,14 @@ func guide() fstest.MapFS {
 
 func TestSync(t *testing.T) {
 	content := t.TempDir()
+	// A folder from when the pages sat in content/<version>/en.
+	old := filepath.Join(content, "0.14", "en", "rules.md")
+	if err := os.MkdirAll(filepath.Dir(old), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(old, []byte("# Rules\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	res, err := sync(guide(), content, "0.14", "", false)
 	if err != nil {
 		t.Fatal(err)
@@ -92,9 +100,15 @@ func TestSync(t *testing.T) {
 	if !reflect.DeepEqual(res.pages, wantPages) {
 		t.Errorf("pages = %q, want %q", res.pages, wantPages)
 	}
+	if _, err := os.Stat(filepath.Join(content, "0.14", "en")); err == nil {
+		t.Error("the old content/0.14/en folder is still there")
+	}
+	if _, err := os.Stat(filepath.Join(content, "0.14", "pages.json")); err != nil {
+		t.Errorf("no pages.json: %v", err)
+	}
 
 	read := func(p string) string {
-		b, err := os.ReadFile(filepath.Join(content, "0.14", "en", filepath.FromSlash(p)))
+		b, err := os.ReadFile(filepath.Join(content, "0.14", filepath.FromSlash(p)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,7 +128,7 @@ func TestSync(t *testing.T) {
 	if rules != wantRules {
 		t.Errorf("rules.md:\n%s\nwant:\n%s", rules, wantRules)
 	}
-	if b, err := os.ReadFile(filepath.Join(content, "0.14", "en", "shots", "rules.png")); err != nil || string(b) != "\x89PNG" {
+	if b, err := os.ReadFile(filepath.Join(content, "0.14", "shots", "rules.png")); err != nil || string(b) != "\x89PNG" {
 		t.Errorf("the picture: %q, %v", b, err)
 	}
 	feel := read("player/feel.md")
@@ -124,7 +138,7 @@ func TestSync(t *testing.T) {
 	if !strings.Contains(feel, "Their settings: Sound haptics. See [Rules](../rules.md).") {
 		t.Errorf("player/feel.md links:\n%s", feel)
 	}
-	if _, err := os.Stat(filepath.Join(content, "0.14", "en", "player", "settings.md")); err == nil {
+	if _, err := os.Stat(filepath.Join(content, "0.14", "player", "settings.md")); err == nil {
 		t.Error("settings.md was copied, but only the guide links count")
 	}
 	if len(res.warnings) != 1 || !strings.Contains(res.warnings[0], "settings.md") {
@@ -147,7 +161,7 @@ func TestSync(t *testing.T) {
 	if _, err := sync(g, content, "0.14", "", false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(content, "0.14", "en", "testing.md")); err == nil {
+	if _, err := os.Stat(filepath.Join(content, "0.14", "testing.md")); err == nil {
 		t.Error("testing.md is still there after the guide dropped it")
 	}
 }
@@ -183,7 +197,7 @@ func TestSyncStopsWhenTheModAPIChanges(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "the 0.14 docs are for mod API 0.12, and this guide is for 0.13") {
 		t.Fatalf("err = %v, want one about the mod API", err)
 	}
-	if _, err := os.Stat(filepath.Join(content, "0.14", "en", "rules.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(content, "0.14", "rules.md")); err != nil {
 		t.Errorf("the refused sync changed the pages: %v", err)
 	}
 	if _, err := sync(g, content, "0.14", "", true); err != nil {

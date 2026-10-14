@@ -1,5 +1,5 @@
 // Command sync copies the modding guide from a Bururu checkout into
-// content/<version>/en, with its links rewritten for this site.
+// content/<version>, with its links rewritten for this site.
 //
 // From the bururu.dev folder:
 //
@@ -52,7 +52,7 @@ func main() {
 	for _, w := range res.warnings {
 		log.Print(w)
 	}
-	fmt.Printf("copied %d pages into %s\n", len(res.pages), filepath.Join(*content, v, "en"))
+	fmt.Printf("copied %d pages into %s\n", len(res.pages), filepath.Join(*content, v))
 	for _, p := range res.pages {
 		if strings.HasPrefix(p, "player/") {
 			fmt.Printf("  %s comes from the player guide: read it before you commit, the site is public\n", p)
@@ -78,7 +78,7 @@ type result struct {
 }
 
 // sync reads the guide from docs (the app's docs folder) and writes it
-// into content/<v>/en. force lets it replace a version whose mod API
+// into content/<v>. force lets it replace a version whose mod API
 // changed.
 func sync(docs fs.FS, content, v, api string, force bool) (*result, error) {
 	names, err := fs.Glob(docs, "modding/*.md")
@@ -181,10 +181,10 @@ func sync(docs fs.FS, content, v, api string, force bool) (*result, error) {
 		return nil, err
 	}
 
-	// Write the pages. Old ones go first, so a page the guide dropped
-	// leaves the site too.
-	enDir := filepath.Join(content, v, "en")
-	if err := os.RemoveAll(enDir); err != nil {
+	// Write the pages. The version's old folder goes first, so a page the
+	// guide dropped leaves the site too.
+	dir := filepath.Join(content, v)
+	if err := os.RemoveAll(dir); err != nil {
 		return nil, err
 	}
 	files := map[string][]byte{}
@@ -195,7 +195,7 @@ func sync(docs fs.FS, content, v, api string, force bool) (*result, error) {
 		files[p] = b
 	}
 	for p, b := range files {
-		file := filepath.Join(enDir, filepath.FromSlash(p))
+		file := filepath.Join(dir, filepath.FromSlash(p))
 		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 			return nil, err
 		}
@@ -221,7 +221,7 @@ func isPicture(p string) bool {
 	return pictureExt[strings.ToLower(path.Ext(p))]
 }
 
-// contentPath is where a page of the app's docs goes in content/<v>/en.
+// contentPath is where a page of the app's docs goes in content/<v>.
 func contentPath(docsPath string) string {
 	if rest, ok := strings.CutPrefix(docsPath, "modding/"); ok {
 		if rest == "README.md" {
